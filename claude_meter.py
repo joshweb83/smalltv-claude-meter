@@ -725,19 +725,19 @@ def render_mascot(usage, source, now=None):
     mood = lvl5
     _slime(d, s(146), s(124), s(4), mood, _BEAT)
 
-    d.line((s(14), s(174), s(W - 14), s(174)), fill=TRACK, width=S)
+    d.line((s(14), s(172), s(W - 14), s(172)), fill=TRACK, width=S)
 
     pw = _pct(week)
     lvl_w = _pace_level(pw, _parse(week.get("resets_at")), now, 7 * 86400)
     cw = DIM if pw is None else (RED if lvl_w == 2 else ACCENT)
-    d.text((s(14), s(179)), "주간 사용량", font=_px(14), fill=FG)
+    d.text((s(14), s(178)), "주간 사용량", font=_px(14), fill=FG)
     wl = _left_text(week.get("resets_at"), now)
     if wl:
         lx = s(14) + d.textlength("주간 사용량", font=_px(14)) + s(6)
-        d.text((lx, s(182)), f"{wl} 남음", font=_px(11, False), fill=DIM)
+        d.text((lx, s(181)), f"{wl} 남음", font=_px(11, False), fill=DIM)
     v = "--" if pw is None else f"{pw:.0f}%"
-    d.text((s(W - 14) - d.textlength(v, font=_px(16)), s(177)), v, font=_px(16), fill=cw)
-    bx0, bx1, by, bh = s(14), s(W - 14), s(200), s(8)
+    d.text((s(W - 14) - d.textlength(v, font=_px(16)), s(176)), v, font=_px(16), fill=cw)
+    bx0, bx1, by, bh = s(14), s(W - 14), s(207), s(8)
     _bar(d, bx0, by, bx1, bh, pw, cw)
     wr = _parse(week.get("resets_at"))
     if wr and wr > now:
