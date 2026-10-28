@@ -53,6 +53,8 @@
 ## 준비물
 
 - GeekMagic **SmallTV Ultra** (순정 펌웨어, PC와 같은 2.4GHz Wi-Fi에 연결)
+  - 구매: [AliExpress — GeekMagic SmallTV Ultra](https://ko.aliexpress.com/item/1005013408213481.html) · 옵션에서 **Ultra**(240×240, ESP8266) 선택. Pro 등 다른 모델은 동작을 확인하지 않았습니다.
+  - 가격·판매처는 바뀔 수 있으며, 이 링크는 제휴 링크가 아닙니다.
 - **Windows PC** + [Python 3.9 이상](https://www.python.org/downloads/) (설치할 때 "Add python.exe to PATH" 체크)
 - Claude Pro / Max 등 사용량 한도가 있는 플랜, 그리고 Claude Code 로그인 또는 claude.ai 세션키
 
@@ -110,6 +112,8 @@
 Turns a **GeekMagic SmallTV Ultra** (240×240, stock firmware) into a desk monitor for your **Claude plan usage** — 5-hour session %, time until reset, and weekly limits. A Windows PC renders a 240×240 JPEG every minute and uploads it to the device's photo-album over the LAN (A/B swap, so no "No image" flicker). White dots on the ring and bars show how much of the window has elapsed: if the colored bar is ahead of the dot, you're burning faster than time.
 
 Usage source, in order: Claude Code statusline hook (no network call; chains any existing statusline) → Claude Code OAuth usage endpoint (15-min interval with 429 backoff) → optional claude.ai `sessionKey`.
+
+**Hardware:** GeekMagic SmallTV Ultra — e.g. [AliExpress](https://ko.aliexpress.com/item/1005013408213481.html) (choose the *Ultra* option).
 
 **Install:** install Python 3.9+ (add to PATH), download this repo, double-click `install.bat`, enter the device IP. `uninstall.bat` restores the stock clock.
 
