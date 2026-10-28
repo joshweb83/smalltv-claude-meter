@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "device_ip": "",             # 장비 IP (장비 부팅 화면 또는 공유기에서 확인)
     "interval_seconds": 60,      # 장비 업로드 간격(초)
     "usage_refresh_seconds": 900,  # 사용량 API 재조회 간격(초, 최소 600) — 잦으면 429 차단
-    "layout": "ring",            # ring: 원형 게이지 / countdown: 남은 시간 크게
+    "layout": "mascot",          # mascot: 마스코트 포함 / ring: 원형 게이지 / countdown: 남은 시간 크게
     "image_name": "claude",      # 장비에 올라가는 파일 이름(claude_a.jpg / claude_b.jpg)
     "brightness": None,
     "rotate": False,             # True: 시계·날씨와 Claude 화면을 번갈아 표시
@@ -597,6 +597,133 @@ def render_ring(usage, source, now=None):
     return img.resize((W, H), Image.LANCZOS)
 
 
+SLIME = [                # 원본 픽셀 슬라임(14x10)
+    "....######....",
+    "..##########..",
+    ".############.",
+    ".############.",
+    "##############",
+    "##############",
+    "##############",
+    "##############",
+    ".############.",
+    "..##..##..##..",
+]
+SWEAT = (140, 190, 230)
+
+
+def _slime(d, x, y, c, mood, beat):
+    """mood: 0 여유(웃음) / 1 주의(무표정+땀) / 2 한도 임박(찡그림+땀)."""
+    y += 0 if beat else c // 2                     # 갱신마다 살짝 통통 튀는 느낌
+    body = ACCENT if mood < 2 else RED
+    for r, row in enumerate(SLIME):
+        for k, ch in enumerate(row):
+            if ch == "#":
+                d.rectangle((x + k * c, y + r * c, x + (k + 1) * c - 1, y + (r + 1) * c - 1),
+                            fill=body)
+    cell = lambda cc, rr, col: d.rectangle((x + cc * c, y + rr * c, x + (cc + 1) * c - 1,
+                                            y + (rr + 1) * c - 1), fill=col)
+    cell(3, 1, FG)                                  # 반짝임
+    if mood == 2:                                   # 질끈 감은 눈
+        for cc in (3, 4, 9, 10):
+            cell(cc, 4, BG)
+        for cc in (6, 7):                           # 벌린 입
+            cell(cc, 6, BG); cell(cc, 7, BG)
+    else:
+        for cc in (4, 9):                           # 눈
+            cell(cc, 3, BG); cell(cc, 4, BG)
+        if mood == 0:                               # 웃는 입
+            cell(5, 6, BG); cell(8, 6, BG); cell(6, 7, BG); cell(7, 7, BG)
+        else:                                       # 일자 입
+            for cc in (5, 6, 7, 8):
+                cell(cc, 7, BG)
+    if mood >= 1:                                   # 땀방울
+        cell(13, 1, SWEAT); cell(13, 2, SWEAT); cell(14, 2, SWEAT)
+    # 그림자
+    d.ellipse((x + 2 * c, y + 10 * c + c // 2 + (c // 2 if beat else 0),
+               x + 12 * c, y + 11 * c + c), fill=(24, 23, 22))
+
+
+def render_mascot(usage, source, now=None):
+    now = now or datetime.now(timezone.utc)
+    img = Image.new("RGB", (W * S, H * S), BG)
+    d = ImageDraw.Draw(img)
+    s = lambda v: v * S
+
+    global _BEAT
+    _BEAT = not globals().get("_BEAT", False)
+    d.ellipse((s(12), s(12), s(28), s(28)), fill=ACCENT)
+    d.ellipse((s(17), s(17), s(23), s(23)), fill=FG if _BEAT else BG)
+    d.text((s(34), s(6)), "Claude", font=_px(21), fill=FG)
+    clock = now.astimezone().strftime("%H:%M")
+    d.text((s(W - 12) - d.textlength(clock, font=_px(15, False)), s(10)), clock,
+           font=_px(15, False), fill=DIM)
+
+    five = usage.get("five_hour") or {}
+    week = usage.get("seven_day") or {}
+    p5 = _pct(five)
+    reset = _parse(five.get("resets_at"))
+    if reset and reset <= now:
+        p5 = 0.0
+    c5 = DIM if p5 is None else _color(p5)
+
+    cx, cy, r, rw = 58, 92, 46, 10
+    _ring(d, s(cx), s(cy), s(r), s(rw), p5, c5)
+    if reset and reset > now:
+        frac = max(0.0, min(1.0, 1 - (reset - now).total_seconds() / FIVE_H))
+        a = math.radians(-90 + 360 * frac)
+        rc, dr = s(r) - s(rw) / 2, s(6.5)
+        px, py = s(cx) + rc * math.cos(a), s(cy) + rc * math.sin(a)
+        d.ellipse((px - dr, py - dr, px + dr, py + dr), fill=FG, outline=BG, width=S * 2)
+    num = "--" if p5 is None else f"{p5:.0f}"
+    fb, fu = _px(32), _px(14)
+    nw, uw = d.textlength(num, font=fb), d.textlength("%", font=fu)
+    x = s(cx) - (nw + uw + s(1)) / 2
+    d.text((x, s(cy - 28)), num, font=fb, fill=FG)
+    d.text((x + nw + s(1), s(cy - 7)), "%", font=fu, fill=FG)
+    _text_c(d, s(cx), s(cy + 10), "사용량", _px(12, False), DIM)
+
+    x0 = 118
+    d.text((s(x0), s(40)), "5시간 세션", font=_px(15), fill=FG)
+    if reset and reset > now:
+        rem = int((reset - now).total_seconds())
+        h, m = divmod((rem + 59) // 60, 60)
+        cd, cc = f"{h}:{m:02d}", FG
+    else:
+        cd, cc = "-:--", DIM
+    fcd = _px(32)
+    d.text((s(x0 - 1), s(55)), cd, font=fcd, fill=cc)
+    d.text((s(x0) + d.textlength(cd, font=fcd) + s(5), s(72)), "남음", font=_px(13, False), fill=DIM)
+    status = "여유" if p5 is None or p5 < 60 else "주의" if p5 < 85 else "한도 임박"
+    fs = _px(13)
+    tw = d.textlength(status, font=fs)
+    d.rounded_rectangle((s(x0), s(98), s(x0) + tw + s(22), s(119)), radius=s(10), fill=c5)
+    d.text((s(x0 + 11), s(99)), status, font=fs, fill=BG)
+
+    mood = 0 if (p5 is None or p5 < 60) else 1 if p5 < 85 else 2
+    _slime(d, s(146), s(124), s(4), mood, _BEAT)
+
+    d.line((s(14), s(174), s(W - 14), s(174)), fill=TRACK, width=S)
+
+    pw = _pct(week)
+    cw = DIM if pw is None else _color(pw)
+    d.text((s(14), s(179)), "주간 사용량", font=_px(14), fill=FG)
+    wl = _left_text(week.get("resets_at"), now)
+    if wl:
+        lx = s(14) + d.textlength("주간 사용량", font=_px(14)) + s(6)
+        d.text((lx, s(182)), f"{wl} 남음", font=_px(11, False), fill=DIM)
+    v = "--" if pw is None else f"{pw:.0f}%"
+    d.text((s(W - 14) - d.textlength(v, font=_px(16)), s(177)), v, font=_px(16), fill=cw)
+    bx0, bx1, by, bh = s(14), s(W - 14), s(200), s(8)
+    _bar(d, bx0, by, bx1, bh, pw, cw)
+    wr = _parse(week.get("resets_at"))
+    if wr and wr > now:
+        frac = max(0.0, min(1.0, 1 - (wr - now).total_seconds() / (7 * 86400)))
+        px, py, dr = bx0 + (bx1 - bx0) * frac, by + bh / 2, s(6)
+        d.ellipse((px - dr, py - dr, px + dr, py + dr), fill=FG, outline=BG, width=S * 2)
+    return img.resize((W, H), Image.LANCZOS)
+
+
 # ---------------------------------------------------------------- device
 class SmallTV:
     def __init__(self, ip):
@@ -969,7 +1096,10 @@ def tick(cfg, tv, demo=False, preview=False):
     else:
         err = None
 
-    if not err and cfg.get("layout", "ring") == "ring":
+    layout = cfg.get("layout", "mascot")
+    if not err and layout == "mascot":
+        img = render_mascot(usage, source)
+    elif not err and layout == "ring":
         img = render_ring(usage, source)
     else:
         img = render(usage, source, error=err, seconds=False)

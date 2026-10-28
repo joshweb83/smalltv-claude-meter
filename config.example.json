@@ -2,7 +2,7 @@
   "device_ip": "",
   "interval_seconds": 60,
   "usage_refresh_seconds": 900,
-  "layout": "ring",
+  "layout": "mascot",
   "image_name": "claude",
   "brightness": null,
   "rotate": false,
