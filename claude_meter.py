@@ -296,6 +296,26 @@ def _color(pct):
     return GREEN if pct < 60 else AMBER if pct < 85 else RED
 
 
+LEVEL_TEXT = ("여유", "주의", "한도 임박")
+
+
+def _pace_level(pct, reset, now, window_sec):
+    """기간 대비 페이스 판정.
+    페이스 = 기간 중 지나간 비율(%) = 고르게 썼을 때의 평균 사용 지점(화면의 흰 점).
+      0 여유      : 사용량이 페이스 이하
+      1 주의      : 페이스보다 10%p 이내로 앞섬
+      2 한도 임박 : 10%p 넘게 앞서거나, 남은 사용량이 10% 미만(사용률 90% 이상)"""
+    if pct is None:
+        return 0
+    if pct >= 90:
+        return 2
+    if not reset or reset <= now:
+        return 0
+    pace = 100 * max(0.0, min(1.0, 1 - (reset - now).total_seconds() / window_sec))
+    over = pct - pace
+    return 0 if over <= 0 else 1 if over <= 10 else 2
+
+
 def _parse(ts):
     """ISO 문자열(소수점 자릿수 무관)·epoch 숫자 모두 처리 — 구버전 Python 호환."""
     if ts is None or ts == "":
@@ -523,7 +543,8 @@ def render_ring(usage, source, now=None):
     reset = _parse(five.get("resets_at"))
     if reset and reset <= now:
         p5 = 0.0                             # 리셋 지났으면 0%
-    c5 = DIM if p5 is None else _color(p5)
+    lvl5 = _pace_level(p5, reset, now, FIVE_H)
+    c5 = DIM if p5 is None else (RED if lvl5 == 2 else ACCENT)
 
     # 5시간 세션 원형 게이지
     cx, cy, r, rw = 60, 98, 48, 11
@@ -555,7 +576,7 @@ def render_ring(usage, source, now=None):
     d.text((s(x0 - 1), s(68)), cd, font=fcd, fill=cc)
     d.text((s(x0) + d.textlength(cd, font=fcd) + s(6), s(88)), "남음",
            font=_px(14, False), fill=DIM)
-    status = "여유" if p5 is None or p5 < 60 else "주의" if p5 < 85 else "한도 임박"
+    status = LEVEL_TEXT[lvl5]
     fs = _px(15)
     tw = d.textlength(status, font=fs)
     d.rounded_rectangle((s(x0), s(120), s(x0) + tw + s(26), s(144)), radius=s(12), fill=c5)
@@ -665,7 +686,8 @@ def render_mascot(usage, source, now=None):
     reset = _parse(five.get("resets_at"))
     if reset and reset <= now:
         p5 = 0.0
-    c5 = DIM if p5 is None else _color(p5)
+    lvl5 = _pace_level(p5, reset, now, FIVE_H)
+    c5 = DIM if p5 is None else (RED if lvl5 == 2 else ACCENT)
 
     cx, cy, r, rw = 58, 92, 46, 10
     _ring(d, s(cx), s(cy), s(r), s(rw), p5, c5)
@@ -694,19 +716,20 @@ def render_mascot(usage, source, now=None):
     fcd = _px(32)
     d.text((s(x0 - 1), s(55)), cd, font=fcd, fill=cc)
     d.text((s(x0) + d.textlength(cd, font=fcd) + s(5), s(72)), "남음", font=_px(13, False), fill=DIM)
-    status = "여유" if p5 is None or p5 < 60 else "주의" if p5 < 85 else "한도 임박"
+    status = LEVEL_TEXT[lvl5]
     fs = _px(13)
     tw = d.textlength(status, font=fs)
     d.rounded_rectangle((s(x0), s(98), s(x0) + tw + s(22), s(119)), radius=s(10), fill=c5)
     d.text((s(x0 + 11), s(99)), status, font=fs, fill=BG)
 
-    mood = 0 if (p5 is None or p5 < 60) else 1 if p5 < 85 else 2
+    mood = lvl5
     _slime(d, s(146), s(124), s(4), mood, _BEAT)
 
     d.line((s(14), s(174), s(W - 14), s(174)), fill=TRACK, width=S)
 
     pw = _pct(week)
-    cw = DIM if pw is None else _color(pw)
+    lvl_w = _pace_level(pw, _parse(week.get("resets_at")), now, 7 * 86400)
+    cw = DIM if pw is None else (RED if lvl_w == 2 else ACCENT)
     d.text((s(14), s(179)), "주간 사용량", font=_px(14), fill=FG)
     wl = _left_text(week.get("resets_at"), now)
     if wl:
