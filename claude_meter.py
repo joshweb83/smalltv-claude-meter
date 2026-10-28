@@ -477,24 +477,45 @@ def _ring(d, cx, cy, r, width, pct, color):
         d.ellipse((x - width / 2, y - width / 2, x + width / 2, y + width / 2), fill=color)
 
 
+PIXEL_ICON = [            # 원본 픽셀 아이콘(막대 계기판) — 7x7
+    ".....##",
+    ".....##",
+    "...####",
+    "...####",
+    ".######",
+    "#######",
+    "#######",
+]
+
+
+def _px(size, bold=True):
+    return _font(int(round(size * S)), bold)
+
+
+def _pixel_icon(d, x, y, cell, color):
+    for r, row in enumerate(PIXEL_ICON):
+        for c, ch in enumerate(row):
+            if ch == "#":
+                d.rectangle((x + c * cell, y + r * cell, x + (c + 1) * cell - 1,
+                             y + (r + 1) * cell - 1), fill=color)
+
+
 def render_ring(usage, source, now=None):
-    """프로젝트 초반 디자인: 5시간 세션 원형 게이지 + 주간 막대(정지 이미지)."""
+    """원형 게이지 디자인(큰 글자 버전): 5시간 세션 + 남은 시간 + 주간 막대."""
     now = now or datetime.now(timezone.utc)
     img = Image.new("RGB", (W * S, H * S), BG)
     d = ImageDraw.Draw(img)
     s = lambda v: v * S
-    f_lbl, f_small = F(13, True), F(11)
 
-    # 동적 요소 ② 하트비트: 갱신될 때마다 로고 점이 커졌다 작아졌다(살아 있음 표시)
+    # 헤더: 픽셀 아이콘(갱신마다 밝기 교차 = 하트비트) + Claude + 시각
     global _BEAT
     _BEAT = not globals().get("_BEAT", False)
-    g = 0 if _BEAT else 2
-    d.ellipse((s(12 + g), s(12 + g), s(24 - g), s(24 - g)), fill=ACCENT)
-    if _BEAT:
-        d.ellipse((s(9), s(9), s(27), s(27)), outline=(110, 60, 45), width=S)
-    d.text((s(31), s(5)), "Claude", font=F(15, True), fill=FG)
+    icon_c = ACCENT if _BEAT else (170, 92, 66)
+    _pixel_icon(d, s(12), s(13), s(3), icon_c)
+    d.text((s(38), s(6)), "Claude", font=_px(22), fill=FG)
     clock = now.astimezone().strftime("%H:%M")
-    d.text((s(W - 12) - d.textlength(clock, font=F(12)), s(8)), clock, font=F(12), fill=DIM)
+    d.text((s(W - 12) - d.textlength(clock, font=_px(16, False)), s(10)), clock,
+           font=_px(16, False), fill=DIM)
 
     five = usage.get("five_hour") or {}
     week = usage.get("seven_day") or {}
@@ -504,70 +525,75 @@ def render_ring(usage, source, now=None):
         p5 = 0.0                             # 리셋 지났으면 0%
     c5 = DIM if p5 is None else _color(p5)
 
-    cx, cy, r = 62, 84, 48
-    _ring(d, s(cx), s(cy), s(r), s(11), p5, c5)
-    # 동적 요소 ① 시간 진행 점: 5시간 중 지나간 시간 위치에 흰 점(1분마다 이동)
-    #   색 막대(사용량)가 흰 점보다 앞서면 시간보다 빨리 쓰고 있다는 뜻
+    # 5시간 세션 원형 게이지
+    cx, cy, r, rw = 60, 98, 48, 11
+    _ring(d, s(cx), s(cy), s(r), s(rw), p5, c5)
+    # 시간 진행 흰 점
     if reset and reset > now:
         frac = max(0.0, min(1.0, 1 - (reset - now).total_seconds() / FIVE_H))
         a = math.radians(-90 + 360 * frac)
-        rc, dr = s(r) - s(11) / 2, s(6.5)
+        rc, dr = s(r) - s(rw) / 2, s(6.5)
         px, py = s(cx) + rc * math.cos(a), s(cy) + rc * math.sin(a)
         d.ellipse((px - dr, py - dr, px + dr, py + dr), fill=FG, outline=BG, width=S * 2)
     num = "--" if p5 is None else f"{p5:.0f}"
-    nw = d.textlength(num, font=F(32, True))
-    uw = d.textlength("%", font=F(12, True))
+    fb, fu = _px(36), _px(15)
+    nw, uw = d.textlength(num, font=fb), d.textlength("%", font=fu)
     x = s(cx) - (nw + uw + s(1)) / 2
-    d.text((x, s(cy - 27)), num, font=F(32, True), fill=FG)
-    d.text((x + nw + s(1), s(cy - 4)), "%", font=F(12, True), fill=DIM)
+    d.text((x, s(cy - 25)), num, font=fb, fill=FG)
+    d.text((x + nw + s(1), s(cy - 1)), "%", font=fu, fill=FG)
 
-    x0 = 124
-    d.text((s(x0), s(36)), "5시간 세션", font=f_lbl, fill=FG)
-    # 리셋까지 남은 시간 — 크게 (H:MM, 분 단위 올림)
-    f_cd = F(24, True)
+    # 오른쪽: 5시간 세션 / 남은 시간 / 상태
+    x0 = 120
+    d.text((s(x0), s(50)), "5시간 세션", font=_px(17), fill=FG)
     if reset and reset > now:
         rem = int((reset - now).total_seconds())
         h, m = divmod((rem + 59) // 60, 60)
         cd, cc = f"{h}:{m:02d}", FG
     else:
         cd, cc = "-:--", DIM
-    d.text((s(x0 - 1), s(53)), cd, font=f_cd, fill=cc)
-    d.text((s(x0) + d.textlength(cd, font=f_cd) + s(5), s(70)), "남음",
-           font=f_small, fill=DIM)
+    fcd = _px(36)
+    d.text((s(x0 - 1), s(68)), cd, font=fcd, fill=cc)
+    d.text((s(x0) + d.textlength(cd, font=fcd) + s(6), s(88)), "남음",
+           font=_px(14, False), fill=DIM)
     status = "여유" if p5 is None or p5 < 60 else "주의" if p5 < 85 else "한도 임박"
-    tw = d.textlength(status, font=f_small)
-    d.rounded_rectangle((s(x0), s(98), s(x0) + tw + s(18), s(120)), radius=s(11), fill=c5)
-    d.text((s(x0 + 9), s(99)), status, font=f_small, fill=BG)
+    fs = _px(15)
+    tw = d.textlength(status, font=fs)
+    d.rounded_rectangle((s(x0), s(120), s(x0) + tw + s(26), s(144)), radius=s(12), fill=c5)
+    d.text((s(x0 + 13), s(121)), status, font=fs, fill=BG)
 
-    d.line((s(14), s(144), s(W - 14), s(144)), fill=TRACK, width=S)
+    d.line((s(14), s(156), s(W - 14), s(156)), fill=TRACK, width=S)
 
+    # 주간(+모델별) 막대
     rows = [("주간", week)]
     for key, label in (("seven_day_opus", "Opus"), ("seven_day_sonnet", "Sonnet")):
         if _pct(usage.get(key)) is not None:
             rows.append((label, usage[key]))
     rows = rows[:2]
-    y = 152 if len(rows) == 2 else 162
+    one = len(rows) == 1
+    fl, fv = (_px(22), _px(20)) if one else (_px(14), _px(14))
+    y, step, bh = (164, 0, 9) if one else (159, 18, 7)
     for label, blk in rows:
         p = _pct(blk)
         c = DIM if p is None else _color(p)
-        d.text((s(14), s(y - 3)), label, font=f_lbl, fill=FG)
         val = "--" if p is None else f"{p:.0f}%"
-        d.text((s(W - 14) - d.textlength(val, font=f_lbl), s(y - 3)), val, font=f_lbl, fill=c)
-        lw = d.textlength("Sonnet", font=f_lbl) + s(10)
-        bx0 = s(14) + lw
-        bx1 = s(W - 14) - d.textlength("100%", font=f_lbl) - s(8)
-        _bar(d, bx0, s(y + 6), bx1, s(8), p, c)
-        # 7일 중 지나간 시간 위치에 흰 점 — 막대가 점을 앞지르면 주간 한도를 빨리 쓰는 중
+        d.text((s(14), s(y)), label, font=fl, fill=FG)
+        vx = s(W - 14) - d.textlength(val, font=fv)
+        d.text((vx, s(y + (1 if one else 0))), val, font=fv, fill=c)
+        bx0 = s(14) + d.textlength("Sonnet" if not one else "주간", font=fl) + s(14)
+        bx1 = s(W - 14) - d.textlength("100%", font=fv) - s(10)
+        by = s(y + (10 if one else 7))
+        _bar(d, bx0, by, bx1, s(bh), p, c)
         wr = _parse((blk or {}).get("resets_at")) or _parse(week.get("resets_at"))
         if wr and wr > now:
             frac = max(0.0, min(1.0, 1 - (wr - now).total_seconds() / (7 * 86400)))
-            px, py, dr = bx0 + (bx1 - bx0) * frac, s(y + 10), s(6)
+            px, py, dr = bx0 + (bx1 - bx0) * frac, by + s(bh) / 2, s(6)
             d.ellipse((px - dr, py - dr, px + dr, py + dr), fill=FG, outline=BG, width=S * 2)
-        y += 26
+        y += step
 
     wl = _left_text(week.get("resets_at"), now)
-    if wl:                                   # 출처 표시는 빼고 주간 리셋만
-        _text_c(d, s(W / 2), s(200), f"주간 리셋 {wl} 남음", f_small, DIM)
+    if wl:
+        fy, ff = (198, _px(14, False)) if one else (200, _px(12, False))
+        _text_c(d, s(W / 2), s(fy), f"주간 리셋 {wl} 남음", ff, DIM)
     return img.resize((W, H), Image.LANCZOS)
 
 
