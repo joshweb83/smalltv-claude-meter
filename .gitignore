@@ -1,0 +1,7 @@
+# 개인 설정·기록 (세션키, 장비 IP, 사용 기록이 들어갈 수 있음)
+config.json
+*.log
+preview.jpg
+preview.gif
+__pycache__/
+*.pyc

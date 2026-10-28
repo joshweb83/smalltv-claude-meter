@@ -1,0 +1,17 @@
+{
+  "device_ip": "",
+  "interval_seconds": 60,
+  "usage_refresh_seconds": 900,
+  "layout": "ring",
+  "image_name": "claude",
+  "brightness": null,
+  "rotate": false,
+  "rotate_themes": [
+    1,
+    3
+  ],
+  "rotate_seconds": 15,
+  "session_key": "",
+  "web_refresh_seconds": 300,
+  "org_id": ""
+}
