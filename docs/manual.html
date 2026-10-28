@@ -129,7 +129,9 @@
     body { padding: 0; font-size: 12px; }
     .wrap { max-width: none; }
     .summary { grid-template-columns: 1fr; }
-    .card, tr { break-inside: avoid; page-break-inside: avoid; }
+    tr, figure, ul.pts li, .boxes, header { break-inside: avoid; page-break-inside: avoid; }
+    h2 { break-after: avoid; page-break-after: avoid; }
+    thead { display: table-header-group; }
     .table-scroll { overflow: visible; }
     .pdf-btn, .pdf-msg { display: none; }
     table { min-width: 0; }
@@ -311,7 +313,7 @@
 <script>
 (async function(){
   var btn=document.getElementById('pdfBtn'), msg=document.getElementById('pdfMsg');
-  var downloads=null;
+  var downloads=null, cuts=[];
   try { downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch(e) {}
   if(!downloads || !window.html2canvas || !window.jspdf) return;
   btn.hidden=false;
@@ -324,6 +326,10 @@
           doc.getElementById('pdfBtn').style.display='none';
           doc.getElementById('pdfMsg').style.display='none';
           var w=doc.querySelector('.wrap'); w.style.width='860px'; w.style.maxWidth='860px';
+          /* 페이지를 나눌 수 있는 지점(행·제목·목록 끝) 기록 → 표 행이 반으로 잘리지 않게 */
+          var top=w.getBoundingClientRect().top;
+          cuts = Array.prototype.map.call(w.querySelectorAll('tr, h2, figure, ul.pts, .boxes, header, section'),
+            function(e){ return (e.getBoundingClientRect().bottom - top) * 2; }).sort(function(a,b){return a-b;});
         }
       });
       /* 설명서는 길어서 A4 세로 여러 페이지로 나눠 저장 */
@@ -332,6 +338,11 @@
       var pxPerMm = canvas.width / pw, pagePx = Math.floor(ph * pxPerMm), y = 0, first = true;
       while (y < canvas.height) {
         var hPx = Math.min(pagePx, canvas.height - y);
+        if (y + hPx < canvas.height) {           /* 페이지 끝을 가장 가까운 행 경계로 당김 */
+          var best = 0;
+          for (var i = 0; i < cuts.length; i++) { var c = cuts[i] - y; if (c > pagePx * 0.5 && c <= pagePx) best = c; }
+          if (best) hPx = Math.floor(best);
+        }
         var part = document.createElement('canvas'); part.width = canvas.width; part.height = hPx;
         part.getContext('2d').drawImage(canvas, 0, y, canvas.width, hPx, 0, 0, canvas.width, hPx);
         if (!first) pdf.addPage();
