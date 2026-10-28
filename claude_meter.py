@@ -49,14 +49,14 @@ DEFAULT_CONFIG = {
 W = H = 240
 S = 2                            # 2배로 그린 뒤 축소
 # Claude 아이덴티티 팔레트: 따뜻한 다크 배경 + 아이보리 글자 + 클레이 오렌지 포인트
-BG = (31, 30, 29)                # #1F1E1D 다크
+BG = (16, 15, 14)                # 거의 검정(장비 LCD에서 대비 확보)
 FG = (250, 249, 245)             # #FAF9F5 아이보리
 DIM = (156, 153, 143)            # 웜 그레이
-TRACK = (55, 53, 49)             # 게이지 바탕
-ACCENT = (217, 119, 87)          # #D97757 Claude 클레이 오렌지
+TRACK = (52, 49, 45)             # 게이지 바탕
+ACCENT = (240, 104, 52)          # Claude 오렌지(#D97757)를 LCD용으로 채도↑ — 옅게 보이는 것 보정
 GREEN = ACCENT                   # 여유 → Claude 오렌지
 AMBER = ACCENT                   # 주의 → Claude 오렌지(배지 문구로 구분)
-RED = (224, 72, 60)              # 한도 임박(85%↑)만 경고 레드
+RED = (235, 30, 38)              # 한도 임박(85%↑) — 오렌지와 확실히 구분되는 빨강
 FIVE_H = 5 * 3600
 
 
@@ -641,7 +641,7 @@ def _slime(d, x, y, c, mood, beat):
         cell(13, 1, SWEAT); cell(13, 2, SWEAT); cell(14, 2, SWEAT)
     # 그림자
     d.ellipse((x + 2 * c, y + 10 * c + c // 2 + (c // 2 if beat else 0),
-               x + 12 * c, y + 11 * c + c), fill=(24, 23, 22))
+               x + 12 * c, y + 11 * c + c), fill=(34, 32, 30))
 
 
 def render_mascot(usage, source, now=None):
